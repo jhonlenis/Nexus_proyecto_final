@@ -100,7 +100,6 @@ export default function RecuperarPage() {
             </button>
           </form>
         )}
-
         <div className="mt-8 text-center">
           <Link href="/login" className="text-[10px] font-black text-gray-600 uppercase hover:text-white transition-all">
             ← Volver al inicio
