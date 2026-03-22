@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import ChatBot from '@/components/ChatBot';
+import ChatBot from '@/app/components/ChatBot';
 
 interface Inscripcion {
   id: number;
@@ -25,7 +25,7 @@ export default function DashboardPage() {
 
   const refrescarInscripciones = useCallback(async (id: number) => {
     try {
-      const res = await fetch(`/api/inscripciones?usuario_id=${id}`);
+      const res = await fetch(`http://localhost:9000/api/inscripciones?usuario_id=${id}`);
       if (res.ok) {
         const data = await res.json();
         setMisInscripciones(data);

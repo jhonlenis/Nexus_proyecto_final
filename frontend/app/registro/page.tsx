@@ -2,9 +2,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { CustomInput } from '@/components/CustomInput';
-import { DocumentSelect } from '@/components/DocumentSelect';
-import { PrimaryButton } from '@/components/PrimaryButton';
+import { CustomInput } from '@/app/components/CustomInput';
+import { DocumentSelect } from '@/app/components/DocumentSelect';
+import { PrimaryButton } from '@/app/components/PrimaryButton';
 
 export default function RegistroPage() {
   const router = useRouter();
@@ -24,7 +24,7 @@ export default function RegistroPage() {
     e.preventDefault();
     setError('');
     try {
-      const response = await fetch('/api/registro', {
+      const response = await fetch('http://localhost:9000/api/registro', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...formData, password }),
