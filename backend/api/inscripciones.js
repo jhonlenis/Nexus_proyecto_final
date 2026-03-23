@@ -1,7 +1,5 @@
-// cspell:disable
-import { NextResponse } from 'next/server';
-import mysql from 'mysql2/promise';
-import { RowDataPacket } from 'mysql2';
+const mysql = require('mysql2/promise');
+
 
 const dbConfig = {
   host: process.env.DB_HOST,
@@ -9,76 +7,56 @@ const dbConfig = {
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
 };
-
-interface MySqlError {
-  message: string;
-}
-
-// GET: Obtener solo las inscripciones DEL USUARIO QUE INICIÓ SESIÓN
-export async function GET(request: Request) {
+// Asegúrate de tener dbConfig definido arriba o importado
+async function obtenerInscripciones() {
   let connection;
   try {
-    // 1. Extraemos el usuario_id de la URL (ej: /api/inscripciones?usuario_id=5)
-    const { searchParams } = new URL(request.url);
-    const usuarioId = searchParams.get('usuario_id');
-
-    // Si no mandan el ID, no sabemos qué mostrar
-    if (!usuarioId) {
-      return NextResponse.json({ error: "No se proporcionó ID de usuario" }, { status: 400 });
-    }
-
     connection = await mysql.createConnection(dbConfig);
     
-    // 2. FILTRADO CRÍTICO: Agregamos el WHERE id_usuario = ?
-    const [rows] = await connection.execute(
-      'SELECT * FROM inscripciones WHERE id_usuario = ? ORDER BY fecha_inscripcion DESC',
-      [usuarioId]
-    );
+    // Consulta para traer las inscripciones
+    // Tip: Puedes hacer un JOIN si quieres traer el nombre del usuario y el programa
+    const query = `
+      SELECT i.id, u.nombres AS usuario, i.programa, i.estado, i.fecha_inscripcion 
+      FROM inscripciones i
+      JOIN usuarios u ON i.id_usuario = u.id
+    `;
     
-    await connection.end();
-    return NextResponse.json(rows);
-  } catch (error: unknown) {
-    if (connection) await connection.end();
-    const dbError = error as MySqlError;
-    return NextResponse.json({ error: dbError.message }, { status: 500 });
-  }
-}
-
-// POST: Crear inscripción vinculada al usuario real
-export async function POST(request: Request) {
-  let connection;
-  try {
-    const { programa, usuario_id } = await request.json();
+    const [rows] = await connection.execute(query);
     
-    if (!usuario_id) {
-      return NextResponse.json({ error: "Sesión no válida" }, { status: 401 });
-    }
-
-    connection = await mysql.createConnection(dbConfig);
-
-    // Validación: ¿Este usuario específico ya tiene este programa?
-    const [rows] = await connection.execute<RowDataPacket[]>(
-      'SELECT id FROM inscripciones WHERE id_usuario = ? AND programa = ?',
-      [usuario_id, programa]
-    );
-
-    if (rows.length > 0) {
+    return { success: true, data: rows };
+  } catch (error) {
+    console.error("Error en la función inscripciones:", error.message);
+    return { success: false, data: [], error: error.message };
+  } finally {
+    if (connection) {
       await connection.end();
-      return NextResponse.json({ error: "Ya estás registrado en este programa" }, { status: 400 });
     }
-
-    // Inserción con el ID real
-    await connection.execute(
-      'INSERT INTO inscripciones (id_usuario, programa, estado) VALUES (?, ?, ?)',
-      [usuario_id, programa, 'Inscrito']
-    );
-
-    await connection.end();
-    return NextResponse.json({ message: "Inscripción exitosa" });
-
-  } catch (error: unknown) {
-    if (connection) await connection.end();
-    const dbError = error as MySqlError;
-    return NextResponse.json({ error: dbError.message }, { status: 500 });
   }
 }
+
+async function inscripciones(programa, usuario_id) {
+  let connection;
+  try {
+    connection = await mysql.createConnection(dbConfig);
+    
+    const query = `
+      INSERT INTO inscripciones (id_usuario, programa, estado, fecha_inscripcion) 
+      VALUES (?, ?, 'Inscrito', NOW())
+    `;
+    
+    const [result] = await connection.execute(query, [usuario_id, programa]);
+    
+    return { success: true, id: result.insertId };
+  } catch (error) {
+    console.error("Error al crear inscripción:", error.message);
+    return { success: false, error: error.message };
+  } finally {
+    if (connection) await connection.end();
+  }
+}
+
+// Exportamos todas las funciones para que puedan ser usadas en index.js
+module.exports = {
+   obtenerInscripciones, 
+   inscripciones,
+  };
