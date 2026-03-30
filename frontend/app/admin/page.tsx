@@ -42,11 +42,12 @@ export default function AdminControlPanel() {
     try {
       setCargando(true);
       const [resU, resP] = await Promise.all([
-        fetch("/api/admin/usuarios"),
-        fetch("/api/admin/programas") 
+        fetch("http://localhost:9000/api/usuariosAdmin"),
+        fetch("http://localhost:9000/api/programasAdmin") 
       ]);
       if (resU.ok) setUsuarios(await resU.json());
       if (resP.ok) setProgramas(await resP.json());
+      
     } catch (e) {
       mostrarMensaje("Error de sincronización", "error");
     } finally {

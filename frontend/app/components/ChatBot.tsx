@@ -1,12 +1,14 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import { log } from 'util';
 
 interface ChatBotProps {
   nombreUsuario: string;
+  userId: number;
 }
 
-export default function ChatBot({ nombreUsuario }: ChatBotProps) {
+export default function ChatBot({ nombreUsuario, userId }: ChatBotProps) {
   const [msg, setMsg] = useState('');
   const [chat, setChat] = useState<{ yo: boolean, texto: string, conBoton?: boolean }[]>([]);
   const [cargando, setCargando] = useState(false);
@@ -35,14 +37,15 @@ export default function ChatBot({ nombreUsuario }: ChatBotProps) {
     setCargando(true);
 
     try {
-      const res = await fetch('/api/chat', {
+      const res = await fetch('http://localhost:9000/api/chatbot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
             mensaje: textoAEnviar,
-            usuarioActual: nombreUsuario 
+            userId,
         }),
       });
+      console.log(userId);
       
       const data = await res.json();
       

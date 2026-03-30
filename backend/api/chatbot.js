@@ -1,94 +1,205 @@
-// cspell:disable
-import { NextResponse } from 'next/server';
-import mysql, { RowDataPacket } from 'mysql2/promise';
+require('dotenv').config();
+const { GoogleGenAI } = require("@google/genai");
+const mysql = require('mysql2/promise');
 
-const dbConfig = {
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  port: Number(process.env.DB_PORT) || 3306,
-};
+// 🔹 Pool de conexiones
+const pool = mysql.createPool({
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME || 'senadb',
+  waitForConnections: true,
+  connectionLimit: 10,
+});
 
-export async function POST(request: Request) {
-  let connection;
+// 🔹 IA
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+  httpOptions: {
+    apiVersion: 'v1',
+    timeout: 10000,
+  },
+});
+
+const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
+
+// =============================
+// 🧠 INTENCIONES
+// =============================
+function detectarIntencion(query) {
+  if (!query) return "GENERAL";
+
+  // 🔥 menú
+  if (query === "menu") return "MENU";
+
+  // 🔥 opciones numéricas
+  if (query === "1") return "PERFIL";
+  if (query === "2" || query.includes("tecnologia")) return "PROGRAMAS_TEC";
+
+  if (query.includes("perfil") || query.includes("mis datos")) return "PERFIL";
+
+  return "GENERAL";
+}
+
+// =============================
+// 📋 MENÚ
+// =============================
+function generarMenu() {
+  return `📋 *MENÚ PRINCIPAL SENA*
+
+1️⃣ Ver mi perfil  
+2️⃣ Programas de tecnología  
+
+✍️ Escribe el número o la opción.
+
+🔙 Escribe "menu" para volver`;
+}
+
+// =============================
+// 🗄️ CONSULTAS DB
+// =============================
+async function buscarInformacionEnDb(query, userId) {
+  console.log("🔍 DB:", query, "| Usuario ID:", userId);
+
   try {
-    const { mensaje, usuarioActual } = await request.json();
-    const input = mensaje.toLowerCase().trim();
-    const nombreParaMostrar = usuarioActual || "Aprendiz";
+    const intencion = detectarIntencion(query);
 
-    // 1. MENÚ PRINCIPAL Y RETORNO
-    const comandosRegresar = ["atras", "regresar", "menu", "volver", "sectores", "inicio"];
-    if (comandosRegresar.some(c => input === c) || input === "hola") {
-      return NextResponse.json({ 
-        respuesta: `👋 ¡Hola, ${nombreParaMostrar}!\n\nEscribe un sector para ver los programas o escribe el nombre de una carrera para ver su detalle:\n\n💻 TECNOLOGÍA\n💼 ADMINISTRATIVO\n🏗️ INDUSTRIAL\n🏥 SALUD\n🌱 AGROPECUARIO\n🍳 GASTRONOMÍA\n🗣️ IDIOMAS`,
-        mostrarBoton: false 
-      });
+    switch (intencion) {
+
+      // 🔹 MENÚ
+      case "MENU":
+        return generarMenu();
+
+      // 🔹 PERFIL
+      case "PERFIL": {
+        if (!userId) return "⚠️ Usuario no autenticado.";
+
+        const [rows] = await pool.execute(
+          `SELECT nombres, apellidos, correo_personal 
+           FROM usuarios 
+           WHERE id = ?`,
+          [userId]
+        );
+
+        if (rows.length === 0) {
+          return "No encontré información de tu perfil.";
+        }
+
+        const user = rows[0];
+
+        return `👤 *Tu perfil*
+Nombre: ${user.nombres} ${user.apellidos}
+Email: ${user.correo_personal}`;
+      }
+
+      // 🔹 PROGRAMAS TECNOLOGÍA
+      case "PROGRAMAS_TEC": {
+        const [rows] = await pool.execute(
+          "SELECT nombre FROM programas WHERE sector = ?",
+          ["Tecnología"]
+        );
+
+        if (rows.length === 0) return "No hay programas disponibles.";
+
+        return `💻 *Programas de Tecnología*
+
+${rows.map((r, i) => `${i + 1}. ${r.nombre}`).join("\n")}
+
+🔙 Escribe "menu" para volver`;
+      }
+
+      default:
+        return null;
     }
 
-    connection = await mysql.createConnection(dbConfig);
-    
-    // 2. BÚSQUEDA DETALLADA (Triple JOIN: Programas + Descripciones + Horarios)
-    const [exactMatch] = await connection.execute<RowDataPacket[]>(
-      `SELECT 
-        p.nombre, 
-        p.sector, 
-        d.breve_descripcion, 
-        h.modalidad, 
-        h.jornada, 
-        h.horario_detalle
-       FROM programas p 
-       LEFT JOIN descripcion_programas d ON p.id = d.id_programa
-       LEFT JOIN horarios_programas h ON p.id = h.id_programa
-       WHERE p.nombre COLLATE utf8mb4_general_ci = ?`, 
-      [input]
-    );
-
-    if (exactMatch.length > 0) {
-      const p = exactMatch[0];
-      
-      // Construimos la sección de horario solo si existe en la base de datos
-      const seccionHorario = p.modalidad 
-        ? `📍 **MODALIDAD:** ${p.modalidad}\n⏰ **JORNADA:** ${p.jornada}\n🗓️ **HORARIO:** ${p.horario_detalle}`
-        : `📍 **HORARIO:** Información de horario pendiente por asignar.`;
-
-      return NextResponse.json({ 
-        respuesta: `📖 **DETALLES DEL PROGRAMA**\n\n✅ **NOMBRE:** ${p.nombre}\n📂 **SECTOR:** ${p.sector}\n\n📝 **DESCRIPCIÓN:**\n${p.breve_descripcion || 'Descripción no disponible.'}\n\n${seccionHorario}\n\n────────────────────\n¿Te gustaría inscribirte? Usa el botón de abajo o escribe "atrás" para volver al menú.`,
-        mostrarBoton: true,
-        esDetalle: true 
-      });
-    }
-
-    // 3. BÚSQUEDA DE LISTA (Si no es nombre exacto)
-    const [rows] = await connection.execute<RowDataPacket[]>(
-      `SELECT nombre FROM programas 
-       WHERE sector COLLATE utf8mb4_general_ci LIKE ? 
-       OR nombre COLLATE utf8mb4_general_ci LIKE ?
-       ORDER BY sector ASC`,
-      [`%${input}%`, `%${input}%`]
-    );
-
-    if (rows.length > 0) {
-      let respuestaFinal = `🔍 **PROGRAMAS ENCONTRADOS:**\n`;
-      rows.forEach((p) => {
-        respuestaFinal += `🔹 ${p.nombre}\n`;
-      });
-      
-      return NextResponse.json({ 
-        respuesta: respuestaFinal + `\n────────────────────\n💡 **Copia el nombre** del programa que te guste y pégalo aquí para ver su **horario y descripción**.`,
-        mostrarBoton: false 
-      });
-    }
-
-    return NextResponse.json({ 
-      respuesta: `🤔 No encontré información sobre "${mensaje}".\n\nEscribe "menú" para ver todas las áreas.`,
-      mostrarBoton: false 
-    });
-
-  } catch (err: unknown) {
-    console.error(err);
-    return NextResponse.json({ respuesta: "❌ Error de conexión con la base de datos." });
-  } finally {
-    if (connection) await connection.end();
+  } catch (error) {
+    console.error("❌ Error en DB:", error.message);
+    return "⚠️ Error consultando la base de datos.";
   }
 }
+
+// =============================
+// 🤖 IA (Gemini)
+// =============================
+async function consultarAPI_IA(userMessage, informacionDB = "") {
+  try {
+    if (!process.env.GEMINI_API_KEY) {
+      return "👋 Soy el asistente del SENA (modo sin IA).";
+    }
+
+    if (!userMessage) {
+      return "Por favor escribe un mensaje válido.";
+    }
+
+    const prompt = `
+Asistente SENA. Responde claro y breve.
+Usuario: ${userMessage}
+Info BD: ${informacionDB || "No hay"}
+`;
+
+    const response = await ai.models.generateContent({
+      model: MODEL,
+      contents: prompt,
+      config: {
+        temperature: 0.7,
+        maxOutputTokens: 80,
+      },
+    });
+
+    return response?.text?.trim() || "No pude generar respuesta.";
+
+  } catch (error) {
+    console.error("❌ Gemini:", error.message);
+
+    if (error.message.includes("quota") || error.message.includes("429")) {
+      return informacionDB
+        ? `📌 ${informacionDB}`
+        : "⚠️ IA no disponible en este momento.";
+    }
+
+    return "⚠️ Error con la IA.";
+  }
+}
+
+// =============================
+// 🚀 CHATBOT PRINCIPAL
+// =============================
+async function chatbot(mensaje, userId) {
+  const input = mensaje?.toLowerCase().trim();
+
+  try {
+    const informacionDB = await buscarInformacionEnDb(input, userId);
+
+    // 🔥 PRIORIDAD: DB primero
+    if (informacionDB) {
+      return {
+        success: true,
+        respuesta: informacionDB,
+        fuente: 'Base de Datos',
+        timestamp: new Date().toISOString()
+      };
+    }
+
+    // 🔹 fallback IA
+    const respuestaIA = await consultarAPI_IA(input);
+
+    return {
+      success: true,
+      respuesta: respuestaIA,
+      fuente: 'IA',
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    console.error("❌ Chatbot:", error.message);
+
+    return {
+      success: false,
+      respuesta: "Error interno del servidor.",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    };
+  }
+}
+
+
+module.exports = { chatbot };

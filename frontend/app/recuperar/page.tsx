@@ -15,8 +15,9 @@ export default function RecuperarPage() {
   const solicitarCodigo = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch("/api/auth/recuperar", {
+      const res = await fetch("http://localhost:9000/api/resetContrasena", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ correo }),
       });
       const data = await res.json();
@@ -33,9 +34,14 @@ export default function RecuperarPage() {
   const cambiarPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch("/api/auth/reset", {
+      const res = await fetch("http://localhost:9000/api/newPassword", {
         method: "PATCH",
-        body: JSON.stringify({ correo, codigo, nuevaPassword }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+           correo_personal: correo, 
+           codigo_2fa: codigo, 
+           nuevaPassword: nuevaPassword
+          }),
       });
       if (res.ok) {
         setMensaje({ texto: "Contraseña actualizada. Ya puedes iniciar sesión", tipo: "exito" });
@@ -55,7 +61,7 @@ export default function RecuperarPage() {
         <div className="absolute -top-24 -right-24 w-48 h-48 bg-green-600/10 rounded-full blur-[80px]"></div>
 
         <div className="text-center mb-10">
-          <Image src="/Sena Logo.png" alt="Sena" width={60} height={60} className="invert mx-auto mb-4" />
+          <Image src="/public/Sena Logo.png" alt="Sena" width={60} height={60} className="invert mx-auto mb-4" />
           <h2 className="text-2xl font-black uppercase italic tracking-tighter text-white">
             Seguridad <span className="text-green-500">2FA</span>
           </h2>

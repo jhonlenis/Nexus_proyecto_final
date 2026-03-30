@@ -1,6 +1,5 @@
-// cspell:disable
-import { NextResponse } from 'next/server';
-import mysql from 'mysql2/promise';
+const mysql = require('mysql2/promise');
+require('dotenv').config(); // Carga las variables del archivo .env
 
 const dbConfig = {
   host: process.env.DB_HOST,
@@ -9,68 +8,20 @@ const dbConfig = {
   database: process.env.DB_NAME,
 };
 
-interface DBError { message: string; }
-
-// GET: Obtener programas
-export async function GET() {
+async function ObtenerProgramasAdmin() {
   let connection;
   try {
     connection = await mysql.createConnection(dbConfig);
-    const [rows] = await connection.execute('SELECT id, nombre, sector FROM programas ORDER BY id DESC');
-    await connection.end();
-    return NextResponse.json(rows);
-  } catch (error: unknown) {
-    if (connection) await connection.end();
-    const dbError = error as DBError;
-    return NextResponse.json({ error: dbError.message }, { status: 500 });
+    const query = `SELECT id, nombre, sector FROM programas`;
+    const [rows] = await connection.execute(query);
+    return { success: true, data: rows };
+  } catch (error) {
+    console.error("Error al obtener programas:", error);
+    return { success: false, data: [], error: "Error al obtener programas" };
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
   }
 }
-
-// POST: Crear programa
-export async function POST(request: Request) {
-  let connection;
-  try {
-    const { nombre, sector } = await request.json();
-    connection = await mysql.createConnection(dbConfig);
-    await connection.execute('INSERT INTO programas (nombre, sector) VALUES (?, ?)', [nombre, sector]);
-    await connection.end();
-    return NextResponse.json({ message: "Creado" });
-  } catch (error: unknown) {
-    if (connection) await connection.end();
-    return NextResponse.json({ error: "Error al crear" }, { status: 500 });
-  }
-}
-
-// PUT: Modificar programa existente
-export async function PUT(request: Request) {
-  let connection;
-  try {
-    const { id, nombre, sector } = await request.json();
-    connection = await mysql.createConnection(dbConfig);
-    await connection.execute(
-      'UPDATE programas SET nombre = ?, sector = ? WHERE id = ?',
-      [nombre, sector, id]
-    );
-    await connection.end();
-    return NextResponse.json({ message: "Actualizado" });
-  } catch (error: unknown) {
-    if (connection) await connection.end();
-    return NextResponse.json({ error: "Error al actualizar" }, { status: 500 });
-  }
-}
-
-// DELETE: Eliminar programa
-export async function DELETE(request: Request) {
-  let connection;
-  try {
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
-    connection = await mysql.createConnection(dbConfig);
-    await connection.execute('DELETE FROM programas WHERE id = ?', [id]);
-    await connection.end();
-    return NextResponse.json({ message: "Eliminado" });
-  } catch (error: unknown) {
-    if (connection) await connection.end();
-    return NextResponse.json({ error: "Error al eliminar" }, { status: 500 });
-  }
-}
+module.exports = { ObtenerProgramasAdmin };

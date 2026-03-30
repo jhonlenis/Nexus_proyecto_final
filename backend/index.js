@@ -1,39 +1,219 @@
+require('dotenv').config();
+
+const mysql = require('mysql2')
+const cors = require('cors');
 const express = require('express');
-const cors = require('cors'); // Importante para conectar con el puerto 3000
+// IMPORTACIÓN COMMONJS (No necesitas poner .js obligatoriamente aquí)
+const { ValidarUsuario } = require('./api/login');
+const { RegistrarUsuarios } = require('./api/registro');
+const { ObtenerProgramasAdmin } = require('./api/programasAdmin');
+const { ObtenerTodosLosUsuarios } = require('./api/usuariosAdmin');
+const { resetPassword } = require('./api/resetContrasena');
+const { newPassword } = require('./api/newPassword');
+const { obtenerInscripciones, inscripciones } = require('./api/inscripciones');
+const { chatbot } = require('./api/chatbot');
+const { ObtenerProgramasUser } = require('./api/programas');
+
 const app = express();
+app.use(express.json());
 
-// --- CONFIGURACIÓN DE MIDDLEWARES ---
-app.use(cors()); // Permite peticiones desde el frontend
-app.use(express.json()); // Permite que el servidor entienda los datos JSON que envías
+app.use(cors({
+  origin: 'http://localhost:3000',
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+app.use(express.json());
 
-// --- RUTAS ---
-
-// Ruta de prueba
-app.get('/', (req, res) => {
-  res.send('API de SENA a un Clic funcionando melamente');
-});
-
-// Ruta de Login (Cambiamos a POST para seguridad)
-app.post('/api/login', (req, res) => {
-  // Aquí recibimos los datos del formulario del frontend
-  const { tipo_documento, numero_documento, correo, password } = req.body;
-
-  console.log(`Intento de login para: ${correo}`);
-
-  // Validación de prueba (Esto luego lo conectarás a tu DB)
-  if (numero_documento === "1234567890" && password === "1234") {
+//endpoint principal
+app.get('/', async (req, res) => {
+  const mensaje = "hola desde ruta principal"
+  try {
     return res.status(200).json({
       success: true,
-      message: '¡Bienvenido al portal!',
-      user: {
-        nombre: "Andres Garcia",
-        rol: "Aprendiz"
-      }
+      message: mensaje
     });
-  } else {
-    return res.status(401).json({
+  } catch (error) {
+    console.error("Error en el servidor:", error);
+    res.status(500).json({
       success: false,
-      message: 'Documento o contraseña incorrectos'
+      message: "Error interno en el servidor"
+    });
+
+  }
+})
+
+// Endpoint para login
+app.post('/api/login', async (req, res) => {
+  try {
+    const resultado = await ValidarUsuario(req.body);
+
+    if (!resultado.success) {
+      return res.status(resultado.status).json({
+        success: false,
+        message: resultado.error
+      });
+    }
+
+    return res.status(200).json(resultado);
+  } catch (error) {
+    console.error("Error en el servidor:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error interno en el servidor"
+    });
+  }
+});
+
+// Endpoint para registrar nuevos usuarios
+app.post('/api/registro', async (req, res) => {
+  try {
+    console.log("Recibiendo solicitud para", req.body.correo_personal);
+
+    const resultado = await RegistrarUsuarios(req.body);
+    // comprobar si el valor recibido es correcto
+    if (!resultado.success) {
+      return res.status(resultado.status || 400).json(resultado);
+    }
+
+    res.status(201).json(resultado);
+
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error al registrar usuario"
+    });
+  }
+})
+
+// Endpoint para obtener usuarios (solo para admin)
+app.get('/api/usuariosAdmin', async (req, res) => {
+  try {
+    const resultado = await ObtenerTodosLosUsuarios();
+
+    // Devolvemos la lista de usuarios con estatus 200 (OK)
+    res.status(200).json(resultado.data || []);
+
+  } catch (error) {
+    res.status(500).json([]);
+  }
+});
+
+// Endpoint para obtener programas (solo para admin)
+app.get('/api/programasAdmin', async (req, res) => {
+  try {
+    const resultado = await ObtenerProgramasAdmin();
+
+    // Devolvemos la lista de programas con estatus 200 (OK)
+    res.status(200).json(resultado.data || []);
+
+  } catch (error) {
+    res.status(500).json([])
+  }
+});
+
+// Endpoint para solicitar restablecimiento de contraseña
+app.post('/api/resetContrasena', async (req, res) => {
+  // Implement the reset password logic here
+  const { correo } = req.body;
+  if (!correo) {
+    return res.status(400).json({
+      success: false,
+      message: "El correo es requerido"
+    });
+  }
+  try {
+    const resultado = await resetPassword(correo);
+    if (resultado.success) {
+      res.status(200).json(resultado);
+    } else {
+      res.status(400).json(resultado);
+    }
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error al enviar correo de restablecimiento"
+    });
+  }
+});
+
+// endpoint para actualizar la contraseña después de verificar el código 2FA
+app.patch('/api/newPassword', async (req, res) => {
+  const { correo_personal, codigo_2fa, nuevaPassword } = req.body;
+  try {
+    const resultado = await newPassword(correo_personal, codigo_2fa, nuevaPassword);
+    if (resultado.success) {
+      res.status(200).json(resultado);
+    } else {
+      res.status(resultado.status || 400).json(resultado);
+    }
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error al actualizar la contraseña"
+    });
+  }
+});
+
+//endpoint para obtener inscripciones
+app.get('/api/inscripciones', async (req, res) => {
+  try {
+    resultado = await obtenerInscripciones();
+    res.status(200).json(resultado);
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error al obtener inscripciones"
+    });
+    console.log("✖️  Error al obtener inscripciones:", error);
+  }
+});
+
+// endpoint para inscribirse a un programa
+app.post('/api/inscripciones', async (req, res) => {
+  const { programa, usuario_id } = req.body
+  try {
+    const resultado = await inscripciones(programa, usuario_id);
+    if (resultado.success) {
+      res.status(200).json(resultado);
+    } else {
+      res.status(400).json(resultado);
+    }
+  } catch (error) {
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+app.post('/api/chatbot', async (req, res) => {
+  const { mensaje, userId } = req.body; // Aquí es donde obtienes los datos del body
+
+  try {
+    const resultado = await chatbot(mensaje, userId);
+    res.json(resultado);
+    console.log("mensaje:", mensaje);
+    console.log("userId:", userId);
+
+
+  } catch (error) {
+    res.status(500).json({ success: false, respuesta: "Error en el servidor" });
+  }
+});
+
+app.get('/api/programas', async (req, res) => {
+  try {
+    const resultado = await ObtenerProgramasUser();
+    res.status(200).json(resultado);
+
+    return { data: resultado, success: true };
+
+
+  } catch (error) {
+    console.error("Error al extraer los programas:", error);
+    res.status(500).json({
+      success: false,
+      respuesta: "Error al extraer los programas"
     });
   }
 });

@@ -49,6 +49,11 @@ async function ValidarUsuario(datos) {
     console.log("Contraseña escrita por el usuario:", password);
     console.log("Hash recuperado de la DB:", usuario.password_hash);
 
+    //saber si la contraseña son iguales o no
+    if (password === usuario.password_hash) {
+      console.log("¡ALERTA! La contraseña parece no estar hasheada. Esto es un riesgo de seguridad.");
+    }
+
     // 3. Verificar contraseña con bcrypt
     const match = await bcrypt.compare(password, usuario.password_hash);
     if (!match) {

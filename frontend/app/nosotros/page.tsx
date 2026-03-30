@@ -2,6 +2,7 @@ import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link'; // Importamos Link para la navegación
 
+
 interface Integrante {
   nombre: string;
   rol: string;
