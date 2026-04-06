@@ -194,8 +194,8 @@ app.post('/api/chatbot', async (req, res) => {
     res.json(resultado);
     console.log("mensaje:", mensaje);
     console.log("userId:", userId);
-
-
+    console.log(resultado);
+    
   } catch (error) {
     res.status(500).json({ success: false, respuesta: "Error en el servidor" });
   }
@@ -214,6 +214,21 @@ app.get('/api/programas', async (req, res) => {
     res.status(500).json({
       success: false,
       respuesta: "Error al extraer los programas"
+    });
+  }
+});
+
+app.get('/api/search', async (req, res) => {
+  const { query } = req.query;
+
+  try {
+    const resultado = await searchPrograms(query);
+    res.status(200).json(resultado);
+  } catch (error) {
+    console.error("Error al buscar programas:", error);
+    res.status(500).json({
+      success: false,
+      respuesta: "Error al buscar programas"
     });
   }
 });

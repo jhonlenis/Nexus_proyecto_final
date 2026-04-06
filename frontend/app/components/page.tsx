@@ -47,6 +47,7 @@ export default function AdminControlPanel() {
       ]);
       if (resU.ok) setUsuarios(await resU.json());
       if (resP.ok) setProgramas(await resP.json());
+      
     } catch (e) {
       mostrarMensaje("Error de sincronización", "error");
     } finally {
