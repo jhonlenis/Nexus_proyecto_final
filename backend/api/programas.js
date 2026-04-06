@@ -33,6 +33,7 @@ async function obtenerDetallesPrograma(programaId) {
   }
 }
 
+//exportaciones globales de esta API
 module.exports = {
   ObtenerProgramasUser,
   obtenerDetallesPrograma
