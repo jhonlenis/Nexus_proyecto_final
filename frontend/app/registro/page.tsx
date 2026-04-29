@@ -59,7 +59,7 @@ export default function RegistroPage() {
               </div>
               <DocumentSelect value={formData.tipo_documento} onChange={(e) => setFormData({...formData, tipo_documento: e.target.value})} />
               <div>
-                <CustomInput label="Número de Documento" type="text" placeholder="Ej: 1023456789" onKeyPress={onlyNumbers} value={formData.numero_documento} onChange={(e) => setFormData({...formData, numero_documento: e.target.value})} />
+                <CustomInput label="Número de Documento" maxLength={10} type="text" placeholder="Ej: 1023456789" onKeyPress={onlyNumbers} value={formData.numero_documento} onChange={(e) => setFormData({...formData, numero_documento: e.target.value})} />
                 <p className="mt-1 text-[10px] font-bold text-black italic text-center">* Solo números, sin puntos.</p>
               </div>
               <CustomInput label="Correo Personal" type="email" placeholder="ejemplo@correo.com" value={formData.correo_personal} onChange={(e) => setFormData({...formData, correo_personal: e.target.value})} />

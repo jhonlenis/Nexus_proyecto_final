@@ -2,7 +2,7 @@ require('dotenv').config();
 const { GoogleGenAI } = require("@google/genai");
 const mysql = require('mysql2/promise');
 
-// 🔹 Pool de conexiones
+// Pool de conexiones
 const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'root',
@@ -12,254 +12,211 @@ const pool = mysql.createPool({
   connectionLimit: 10,
 });
 
-// 🔹 IA
+// IA
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    apiVersion: 'v1',
-    timeout: 10000,
-  },
 });
 
 const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
+
+let estadoUsuario = {}; // Mantiene el estado/flujo de cada usuario
 
 // =============================
 // 🧠 INTENCIONES
 // =============================
 function detectarIntencion(query) {
-  if (!query) return "GENERAL";
+  const mensaje = (query || "").toLowerCase().trim();
+  if (!mensaje) return "GENERAL";
 
-  // 🔥 menú
-  if (query === "menu") return "MENU";
+  if (mensaje === "menu") return "MENU";
+  if (mensaje === "1") return "PERFIL";
+  if (mensaje === "2" || mensaje.includes("tecnologia")) return "PROGRAMAS_TEC";
+  if (mensaje === "3" || mensaje.includes("idiomas") || mensaje.includes("educación")) return "IDIOMAS";
+  if (mensaje === "4") return "VER_INSCRIPCION";
+  if (mensaje === "5" || mensaje.includes("inscribir")) return "INSCRIBIRSE";
+  if (mensaje === "6" || mensaje.includes("editar perfil")) return "EDITAR_PERFIL";
+  if (mensaje === "0" || mensaje === "salir") return "SALIR";
 
-  // 🔥 opciones numéricas
-  if (query === "1") return "PERFIL";
-  if (query === "2" || query.includes("tecnologia")) return "PROGRAMAS_TEC";
-  if (query === "3") return "ADMINISTRATIVO_FIN";
-  if (query === "4") return "INDUSTRIAL_CONSTRUCCION"
-  if (query === "5" || query.includes("Salud") || query.includes("Servicios Sociales")) return "SALUD_SERVICIOS";
-  if (query === "6" || query.includes("Agropecuario") || query.includes("Ambiental")) return "AGROPECUARIO_AMBIENTAL";
-  if (query === "7"|| query.includes("Gastronomía") || query.includes("Turismo")) return "GASTRONOMIA_TURISMO";
-  if (query === "8" || query.includes("Idiomas") || query.includes("Educación")) return "IDIOMAS_EDUCACION";
-  if (query === "9") return "INSCRIPCION";
-  if (query === "10" || query.includes("editar perfil")) return "EDITAR_PERFIL";
-
-  if (query.includes("perfil") || query.includes("mis datos")) return "PERFIL";
-
-  if (query.includes("andministracion") || query.includes("finaciero")) return "ADMINISTRATIVO_FIN";
-
-  if (query.includes("industrial") || query.includes("construcion")) return "INDUSTRIAL_CONSTRUCCION";
-
+  if (mensaje.includes("perfil") || mensaje.includes("mis datos")) return "PERFIL";
   return "GENERAL";
 }
 
 // =============================
-// 📋 MENÚ
+// 📋 MENÚS
 // =============================
 function generarMenu() {
   return `📋 *MENÚ PRINCIPAL SENA*
 
 1️⃣ Ver mi perfil  
 2️⃣ Programas de tecnología
-3️⃣ Programas de Administrativo y Financiero
-4️⃣ Programas de Industrial y Construcción
-5️⃣ Programas de Salud y Servicios Sociales
-6️⃣ Programas de Agropecuario y Ambiental
-7️⃣ Programas de Gastronomía y Turismo
-8️⃣ Programas de Idiomas y Educación
-9️⃣ Incríbete a un programa
-🔟 Editar mi perfil 
+3️⃣ Programas de Idiomas
+4️⃣ Ver mis inscripciones
+5️⃣ Inscribirme en un programa
+6️⃣ Editar mi perfil 
+0️⃣ Salir
 
-✍️ Escribe el número o la opción.
+✍️ Escribe el número o la opción.`;
+}
 
-🔙 Escribe "menu" para volver`;
+function generarSubMenuEditar() {
+  return `✍️ *¿Qué campo deseas editar?*
+
+1️⃣ Nombres
+2️⃣ Apellidos
+3️⃣ Correo Personal
+4️⃣ Número de Documento
+5️⃣ Tipo de Documento
+0️⃣ Volver al menú principal
+
+Escribe el número de la opción que quieres cambiar.`;
 }
 
 // =============================
-// 🗄️ CONSULTAS DB
+// 🗄️ LÓGICA DE BASE DE DATOS Y FLUJOS
 // =============================
-async function buscarInformacionEnDb(query, userId) {
-  console.log("🔍 DB:", query, "| Usuario ID:", userId);
+async function buscarInformacionEnDb(query, userId, mensajeOriginal) {
+  const input = (query || "").toLowerCase().trim();
 
   try {
-    const intencion = detectarIntencion(query);
+    // 1. SI ESCRIBE "MENU" - RESETEAR ESTADO Y MOSTRAR
+    if (input === "menu") {
+      estadoUsuario[userId] = { paso: "menu_activo" };
+      return generarMenu();
+    }
 
+    const estado = estadoUsuario[userId];
+
+    // 2. MANEJO DE FLUJOS ACTIVOS (PASO A PASO)
+    
+    // --- FLUJO: INSCRIPCIÓN ---
+    if (estado === "esperando_programa") {
+      const [rows] = await pool.execute(
+        `SELECT * FROM programas WHERE LOWER(nombre) = LOWER(?)`,
+        [mensajeOriginal.trim()]
+      );
+      if (rows.length === 0) return "❌ Programa no encontrado. Escribe el nombre exacto.";
+      
+      estadoUsuario[userId] = { paso: "confirmar_inscripcion", programaNombre: rows[0].nombre };
+      return `✅ Encontré el programa "${rows[0].nombre}".\n\n¿Deseas inscribirte? Responde "si" o "no".`;
+    }
+
+    if (estado?.paso === "confirmar_inscripcion") {
+      if (input === "si") {
+        await pool.execute(
+          "INSERT INTO inscripciones (id_usuario, programa, estado, fecha_inscripcion) VALUES (?, ?, 'Inscrito', NOW())",
+          [userId, estado.programaNombre]
+        );
+        estadoUsuario[userId] = { paso: "menu_activo" };
+        return `✅ ¡Te has inscrito exitosamente en ${estado.programaNombre}!`;
+      }
+      estadoUsuario[userId] = { paso: "menu_activo" };
+      return "❌ Inscripción cancelada. Escribe 'menu' para ver opciones.";
+    }
+
+    // --- FLUJO: EDITAR PERFIL (Selección de opción) ---
+    if (estado?.paso === "editando_perfil_seleccion") {
+      const opciones = {
+        "1": { campo: "nombres", label: "Nombres" },
+        "2": { campo: "apellidos", label: "Apellidos" },
+        "3": { campo: "correo_personal", label: "Correo Personal" },
+        "4": { campo: "numero_documento", label: "Número de Documento" },
+        "5": { campo: "tipo_documento", label: "Tipo de Documento" }
+      };
+
+      if (input === "0") {
+        estadoUsuario[userId] = { paso: "menu_activo" };
+        return generarMenu();
+      }
+
+      if (opciones[input]) {
+        estadoUsuario[userId] = { paso: "esperando_nuevo_valor", campo: opciones[input].campo, label: opciones[input].label };
+        return `✍️ Has seleccionado editar: *${opciones[input].label}*.\nPor favor, escribe el nuevo valor:`;
+      }
+      return "⚠️ Opción no válida. Elige un número del 1 al 5 o 0 para salir.";
+    }
+
+    // --- FLUJO: EDITAR PERFIL (Guardar nuevo valor) ---
+    if (estado?.paso === "esperando_nuevo_valor") {
+      const { campo, label } = estado;
+      await pool.execute(
+        `UPDATE usuarios SET ${campo} = ? WHERE id = ?`,
+        [mensajeOriginal.trim(), userId]
+      );
+      estadoUsuario[userId] = { paso: "menu_activo" };
+      return `✅ ¡Tu *${label}* ha sido actualizado con éxito!\n\nEscribe "menu" para volver.`;
+    }
+
+    // 3. VALIDACIÓN DE ACCESO AL MENÚ
+    if (!estado || estado === "fuera_de_menu") {
+      return "⚠️ Hola. Para ver las opciones disponibles y poder ayudarte, primero necesitas escribir la palabra *'menu'*";
+    }
+
+    // 4. SWITCH DE INTENCIONES (Menú principal)
+    const intencion = detectarIntencion(input);
     switch (intencion) {
-
-      // 🔹 MENÚ
       case "MENU":
         return generarMenu();
 
-      // 🔹 PERFIL
       case "PERFIL": {
-        if (!userId) return "⚠️ Usuario no autenticado.";
-
-        const [rows] = await pool.execute(
-          `SELECT nombres, apellidos, correo_personal 
-           FROM usuarios 
-           WHERE id = ?`,
-          [userId]
-        );
-
-        if (rows.length === 0) {
-          return "No encontré información de tu perfil.";
-        }
-
-        const user = rows[0];
-
-        return `👤 *Tu perfil*
-Nombre: ${user.nombres} ${user.apellidos}
-Email: ${user.correo_personal}`;
+        const [rows] = await pool.execute("SELECT nombres, apellidos, correo_personal FROM usuarios WHERE id = ?", [userId]);
+        if (rows.length === 0) return "No encontré tu perfil.";
+        const u = rows[0];
+        return `👤 *Tu perfil*\nNombre: ${u.nombres} ${u.apellidos}\nEmail: ${u.correo_personal}\n\n🔙 Escribe "menu" para volver.`;
       }
 
-      // 🔹 PROGRAMAS TECNOLOGÍA
       case "PROGRAMAS_TEC": {
-        const [rows] = await pool.execute(
-          "SELECT nombre FROM programas WHERE sector = ?",
-          ["Tecnología"]
-        );
-
-        if (rows.length === 0) {
-          return "No hay programas disponibles en la base de datos.";
-        }
-
-        return `💻 *Programas de Tecnología*\n${rows.map((r, i) => `${i + 1}. ${r.nombre}`).join("\n")}
-🔙 Escribe "menu" para volver`;
+        const [rows] = await pool.execute("SELECT nombre FROM programas WHERE sector = 'Tecnología'");
+        return `💻 *Programas de Tecnología*\n${rows.map((r, i) => `${i + 1}. ${r.nombre}`).join("\n")}\n\n🔙 Escribe "menu" para volver.`;
       }
 
-      // 🔹 PROGRAMAS ADMINISTRATIVO Y FINANCIERO
-      case "ADMINISTRATIVO_FIN": {
-        const [rows] = await pool.execute(
-          "SELECT nombre FROM programas WHERE sector = ?",
-          ["Administrativo y Financiero"]
-        );
-
-        if (rows.length === 0) {
-          return "No hay programas disponibles en la base de datos.";
-        }
-
-        return `💻 *Programas de Administrativo y Financiero*\n${rows.map((r, i) => `${i + 1}. ${r.nombre}`).join("\n")}
-🔙 Escribe "menu" para volver`;
+      case "IDIOMAS": {
+        const [rows] = await pool.execute("SELECT nombre FROM programas WHERE sector = 'Idiomas y Educación'");
+        return `📚 *Programas de Idiomas*\n${rows.map((r, i) => `${i + 1}. ${r.nombre}`).join("\n")}\n\n🔙 Escribe "menu" para volver.`;
       }
 
-      // 🔹 PROGRAMAS INDUSTRIAL Y CONSTRUCCIÓN
-      case "INDUSTRIAL_CONSTRUCCION": {
-        const [rows] = await pool.execute(
-          "SELECT nombre FROM programas WHERE sector = ?",
-          ["Industrial y Construcción"]
-        );
-
-        if (rows.length === 0) {
-          return "No hay programas disponibles en la base de datos.";
-        }
-
-        return `🏗️ *Programas de Industrial y Construcción*\n${rows.map((r, i) => `${i + 1}. ${r.nombre}`).join("\n")}
-🔙 Escribe "menu" para volver`;
-      }
-      case "SALUD_SERVICIOS": {
-        const [rows] = await pool.execute(
-          "SELECT nombre FROM programas WHERE sector = ?",
-          ["Salud y Servicios Sociales"]
-        );
-        if (rows.length === 0) {
-          return "No hay programas disponibles en la base de datos.";
-        }
-
-        return `🏥 *Programas de Salud y Servicios Sociales*\n${rows.map((r, i) => `${i + 1}. ${r.nombre}`).join("\n")}
-🔙 Escribe "menu" para volver`;
+      case "VER_INSCRIPCION": {
+        const [rows] = await pool.execute("SELECT programa FROM inscripciones WHERE id_usuario = ?", [userId]);
+        if (rows.length === 0) return "No tienes inscripciones activas.";
+        return `✅ *Tus Inscripciones*\n${rows.map((r, i) => `${i + 1}. ${r.programa}`).join("\n")}\n\n🔙 Escribe "menu" para volver.`;
       }
 
-      case "AGROPECUARIO_AMBIENTAL": {
-        const [rows] = await pool.execute(
-          "SELECT nombre FROM programas WHERE sector = ?",
-          ["Agropecuario y Ambiental"]
-        );
-        if (rows.length === 0) {
-          return "No hay programas disponibles en la base de datos.";
-        }
+      case "INSCRIBIRSE":
+        estadoUsuario[userId] = "esperando_programa";
+        return "✍️ ¿A qué programa deseas inscribirte? (Escribe el nombre completo)";
 
-        return `� *Programas de Agropecuario y Ambiental*\n${rows.map((r, i) => `${i + 1}. ${r.nombre}`).join("\n")}
-🔙 Escribe "menu" para volver`;
+      case "EDITAR_PERFIL": {
+        const [rows] = await pool.execute("SELECT * FROM usuarios WHERE id = ?", [userId]);
+        const u = rows[0];
+        estadoUsuario[userId] = { paso: "editando_perfil_seleccion" };
+        return `👤 *Datos Actuales:*\n1. Nombres: ${u.nombres}\n2. Apellidos: ${u.apellidos}\n3. Email: ${u.correo_personal}\n4. Doc: ${u.numero_documento}\n5. Tipo: ${u.tipo_documento}\n\n` + generarSubMenuEditar();
       }
 
-      case "GASTRONOMIA_TURISMO": {
-        const [rows] = await pool.execute(
-          "SELECT nombre FROM programas WHERE sector = ?",
-          ["Gastronomía y Turismo"]
-        );
-        if (rows.length === 0) {
-          return "No hay programas disponibles en la base de datos.";
-        }
-
-        return `�️ *Programas de Gastroonomía y Turismo*\n${rows.map((r, i) => `${i + 1}. ${r.nombre}`).join("\n")}
-🔙 Escribe "menu" para volver`;
-      }
-
-      case "IDIOMAS_EDUCACION": {
-        const [rows] = await pool.execute(
-          "SELECT nombre FROM programas WHERE sector = ?",
-          ["Idiomas y Educación"]
-        );
-        if (rows.length === 0) {
-          return "No hay programas disponibles en la base de datos.";
-        }
-
-        return `📚 *Programas de Idiomas y Educación*\n${rows.map((r, i) => `${i + 1}. ${r.nombre}`).join("\n")}
-🔙 Escribe "menu" para volver`;
-      }
+      case "SALIR":
+        estadoUsuario[userId] = "fuera_de_menu";
+        return "👋 Has salido del menú. Cuando me necesites, escribe 'menu'.";
 
       default:
-        return null;
+        return null; // Si no hay intención clara, pasa a la IA
     }
 
   } catch (error) {
     console.error("❌ Error en DB:", error.message);
-    return "⚠️ Error consultando la base de datos.";
+    return "⚠️ Lo siento, tuve un problema al procesar tu solicitud en la base de datos.";
   }
 }
-
-
 
 // =============================
 // 🤖 IA (Gemini)
 // =============================
-async function consultarAPI_IA(userMessage, informacionDB = "") {
+async function consultarAPI_IA(userMessage) {
   try {
-    if (!process.env.GEMINI_API_KEY) {
-      return "👋 Soy el asistente del SENA (modo sin IA).";
-    }
-
-    if (!userMessage) {
-      return "Por favor escribe un mensaje válido.";
-    }
-
-    const prompt = `
-Asistente SENA. Responde claro y breve.
-Usuario: ${userMessage}
-Info BD: ${informacionDB || "No hay"}
-`;
-
-    const response = await ai.models.generateContent({
-      model: MODEL,
-      contents: prompt,
-      config: {
-        temperature: 0.7,
-        maxOutputTokens: 80,
-      },
-    });
-
-    return response?.text?.trim() || "No pude generar respuesta.";
-
+    if (!process.env.GEMINI_API_KEY) return "👋 Soy el asistente del SENA.";
+    const prompt = `Asistente SENA. Responde claro y breve, si no entiendes algo, pregunta. Usuario dice: ${userMessage}`;
+    const result = await ai.getGenerativeModel({ model: MODEL }).generateContent(prompt);
+    const response = await result.response;
+    return response.text().trim() || "No pude generar una respuesta.";
   } catch (error) {
-    console.error("❌ Gemini:", error.message);
-
-    if (error.message.includes("quota") || error.message.includes("429")) {
-      return informacionDB
-        ? `📌 ${informacionDB}`
-        : "⚠️ IA no disponible en este momento.";
-    }
-
-    return "⚠️ Error con la IA.";
+    return "⚠️ IA no disponible temporalmente.";
   }
 }
 
@@ -270,38 +227,18 @@ async function chatbot(mensaje, userId) {
   const input = mensaje?.toLowerCase().trim();
 
   try {
-    const informacionDB = await buscarInformacionEnDb(input, userId);
+    const informacionDB = await buscarInformacionEnDb(input, userId, mensaje);
 
-    // 🔥 PRIORIDAD: DB primero
     if (informacionDB) {
-      return {
-        success: true,
-        respuesta: informacionDB,
-        fuente: 'Base de Datos',
-        timestamp: new Date().toISOString()
-      };
+      return { success: true, respuesta: informacionDB, fuente: 'Base de Datos' };
     }
 
-    // 🔹 fallback IA
     const respuestaIA = await consultarAPI_IA(input);
-
-    return {
-      success: true,
-      respuesta: respuestaIA,
-      fuente: 'IA',
-      timestamp: new Date().toISOString()
-    };
+    return { success: true, respuesta: respuestaIA, fuente: 'IA' };
 
   } catch (error) {
-    console.error("❌ Chatbot:", error.message);
-
-    return {
-      success: false,
-      respuesta: "Error interno del servidor.",
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    };
+    return { success: false, respuesta: "Error interno del sistema." };
   }
 }
-
 
 module.exports = { chatbot };

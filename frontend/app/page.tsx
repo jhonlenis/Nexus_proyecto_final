@@ -13,8 +13,8 @@ export default function Home() {
         {/* Logo del proyecto */}
         <div className="flex justify-center mb-6">
           <Image 
-            src="/Sena Logo.png" 
-            alt="Logo SENA a un Clic"
+            src="/nexus_icon.jpeg" 
+            alt="NEXUS"
             width={120}    
             height={120}
             className="drop-shadow-md object-contain"
@@ -23,7 +23,7 @@ export default function Home() {
         </div>
 
         <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4">
-          SENA a un <span className="text-green-600">Clic</span>
+          NE <span className="text-green-600">XUS</span>
         </h1>
         
         <p className="text-lg text-gray-600 mb-10 leading-relaxed">

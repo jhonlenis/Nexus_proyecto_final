@@ -28,10 +28,7 @@ app.use(express.json());
 app.get('/', async (req, res) => {
   const mensaje = "hola desde ruta principal"
   try {
-    return res.status(200).json({
-      success: true,
-      message: mensaje
-    });
+    return res.send(`<h1>${mensaje}</h1>`);
   } catch (error) {
     console.error("Error en el servidor:", error);
     res.status(500).json({
@@ -233,17 +230,26 @@ app.get('/api/search', async (req, res) => {
   }
 });
 
-app.get('/api/detallesPrograma', async (req, res) => {
-  const { id } = req.query;
+app.get('/api/detallesProgramas', async (req, res) => {
+  const { nombre } = req.query;
+
+  if (!nombre) {
+    return res.status(400).json({
+      success: false,
+      respuesta: "Nombre no proporcionado"
+    });
+  }
 
   try {
-    const resultado = await obtenerDetallesPrograma(id);
+    const resultado = await obtenerDetallesPrograma(nombre);
+    console.log("Nombre recibido:", nombre);
+
     res.status(200).json(resultado);
   } catch (error) {
-    console.error("Error al obtener detalles del programa:", error);
+    console.error("Error al obtener detalles:", error);
     res.status(500).json({
       success: false,
-      respuesta: "Error al obtener detalles del programa"
+      respuesta: "Error al obtener detalles"
     });
   }
 });

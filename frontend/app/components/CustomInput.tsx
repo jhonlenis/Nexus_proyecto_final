@@ -6,9 +6,10 @@ interface InputProps {
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; // Agregado
   required?: boolean;
   onKeyPress?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  maxLength?: 10; // Agregado para limitar la longitud del input
 }
 
-export const CustomInput = ({ label, type, placeholder, value, onChange, required = true, onKeyPress }: InputProps) => (
+export const CustomInput = ({ label, type, placeholder, value, onChange, required = true, onKeyPress, maxLength }: InputProps) => (
   <div className="w-full">
     <label className="block text-sm font-bold text-black mb-1">{label}</label>
     <input 
@@ -18,7 +19,8 @@ export const CustomInput = ({ label, type, placeholder, value, onChange, require
       onKeyPress={onKeyPress}
       required={required}
       className="w-full px-4 py-2 rounded-xl border border-gray-300 text-black outline-none focus:ring-2 focus:ring-green-500 placeholder:text-gray-400 transition-all" 
-      placeholder={placeholder} 
+      placeholder={placeholder}
+      maxLength={maxLength} // Agregado para limitar la longitud del input 
     />
   </div>
 );
