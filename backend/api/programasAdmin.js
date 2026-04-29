@@ -24,4 +24,18 @@ async function ObtenerProgramasAdmin() {
     }
   }
 }
-module.exports = { ObtenerProgramasAdmin };
+
+async function updatedProgram(id_programa, nombre, sector) {
+  
+}
+
+async function createdProgram(nombre, sector) {
+  
+}
+
+
+async function deletProgram(id_programa) {
+  
+}
+
+module.exports = { ObtenerProgramasAdmin, updatedProgram, createdProgram, deletProgram };

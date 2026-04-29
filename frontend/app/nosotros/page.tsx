@@ -56,10 +56,10 @@ const NosotrosPage = () => {
         {/* Encabezado */}
         <section className="text-center mb-16">
           <h1 className="text-4xl font-extrabold text-green-700 sm:text-5xl drop-shadow-sm">
-            SENA a un Clic
+            NEXUS
           </h1>
           <p className="mt-4 text-xl text-gray-600 font-medium">
-            Asistente Inteligente para la Gestión Académica - CTMA
+            Asistente Inteligente
           </p>
         </section>
 
@@ -67,7 +67,7 @@ const NosotrosPage = () => {
         <section className="bg-white/80 backdrop-blur-sm p-8 rounded-3xl shadow-xl border border-white mb-12">
           <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">Sobre el Proyecto</h2>
           <p className="text-gray-600 leading-relaxed mb-6">
-            SENA a un Clic es una plataforma diseñada para orientar a los aprendices en sus procesos administrativos. 
+            NEXUS una plataforma diseñada para orientar a los aprendices en sus procesos administrativos. 
             A través de un ChatBot inteligente, brindamos una guía paso a paso para que el usuario sepa exactamente 
             cómo realizar sus trámites sin perderse en la plataforma oficial.
           </p>

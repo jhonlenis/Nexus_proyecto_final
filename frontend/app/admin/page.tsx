@@ -128,7 +128,7 @@ export default function AdminControlPanel() {
       {/* SIDEBAR */}
       <aside className="fixed left-0 top-0 h-full w-64 bg-[#111] border-r border-green-900/30 p-6 flex flex-col shadow-2xl">
         <div className="flex items-center gap-3 mb-10">
-          <Image src="/Sena Logo.png" alt="Sena" width={40} height={40} className="invert" />
+          <Image src="/nexus_icon.jpeg" alt="NEXUS" width={40} height={40} className="invert" />
           <span className="font-black text-xl tracking-tighter uppercase leading-none">ADMIN <span className="text-green-500 block">CONTROL</span></span>
         </div>
         <nav className="space-y-2 flex-1">
@@ -143,7 +143,7 @@ export default function AdminControlPanel() {
         <header className="mb-10 flex justify-between items-end">
           <div>
             <h1 className="text-4xl font-black uppercase italic tracking-tighter text-white">Panel <span className="text-green-500">Administrativo</span></h1>
-            <p className="text-gray-400 text-[10px] uppercase tracking-[0.3em] mt-2 font-bold italic">Alexander Holguín • ADSO 2026</p>
+            <p className="text-gray-400 text-[10px] uppercase tracking-[0.3em] mt-2 font-bold italic">ADSO 2026</p>
           </div>
           <div className="bg-[#151515] px-5 py-2 rounded-full border border-green-500/20 text-[10px] font-black text-green-500 uppercase flex items-center gap-2">
             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> Sistema Online

@@ -62,7 +62,7 @@ export default function LoginPage() {
       <div className="absolute top-1/4 -right-20 w-80 h-80 bg-green-200 rounded-full blur-3xl opacity-20"></div>
 
       <div className="bg-white shadow-2xl rounded-3xl p-8 max-w-md w-full border border-green-100 relative z-10">
-        <h2 className="text-3xl font-extrabold text-black mb-2 text-center italic tracking-tighter uppercase">SENA <span className="text-green-600">UN CLIC</span></h2>
+        <h2 className="text-3xl font-extrabold text-black mb-2 text-center italic tracking-tighter uppercase">NEXUS <span className="text-green-600">bot</span></h2>
         <p className="text-black/70 mb-8 font-medium text-center uppercase text-[10px] tracking-widest">Inicia Sesión en el Portal</p>
 
         {error && (
@@ -79,6 +79,7 @@ export default function LoginPage() {
 
           <CustomInput 
             label="Número de Documento" 
+            maxLength={10}
             type="text" 
             placeholder="Ej: 1023456789"
             value={formData.numero_documento}

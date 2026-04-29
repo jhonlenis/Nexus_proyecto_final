@@ -7,34 +7,59 @@ const dbConfig = {
   database: process.env.DB_NAME,
 };
 
+// ✅ Obtener programas
 async function ObtenerProgramasUser() {
+  let connection;
   try {
-    const connection = await mysql.createConnection(dbConfig);
-    const [rows] = await connection.execute('SELECT id, nombre, sector FROM programas');
-    await connection.end();
+    connection = await mysql.createConnection(dbConfig);
+
+    const [rows] = await connection.execute(
+      'SELECT id, nombre, sector FROM programas'
+    );
+
     return rows;
   } catch (error) {
     console.error("Error al obtener programas:", error);
     throw error;
+  } finally {
+    if (connection) await connection.end();
   }
-
 }
 
+// ✅ Obtener detalles por nombre
+async function obtenerDetallesPrograma(nombre) {
+  if (!nombre) throw new Error("Nombre undefined");
 
-async function obtenerDetallesPrograma(programaId) {
+  let connection;
+
   try {
-    const connection = await mysql.createConnection(dbConfig);
-    const [rows] = await connection.execute('SELECT * FROM programas WHERE id = ?', [programaId]);
-    await connection.end();
-    return rows[0];
+    connection = await mysql.createConnection(dbConfig);
+
+    const [rows] = await connection.execute(`
+  SELECT 
+    p.nombre,
+    d.breve_descripcion,
+    h.modalidad,
+    h.horario_detalle
+  FROM programas p
+  LEFT JOIN descripcion_programas d
+  ON p.id = d.id_programa
+  LEFT JOIN horarios_programas h
+  ON p.id = h.id_programa
+  WHERE p.nombre = ?
+`, [nombre]);
+
+    return rows[0] || null;
+
   } catch (error) {
-    console.error("Error al obtener detalles del programa:", error);
+    console.error("Error al obtener detalles:", error);
     throw error;
+  } finally {
+    if (connection) await connection.end();
   }
 }
 
-//exportaciones globales de esta API
 module.exports = {
   ObtenerProgramasUser,
   obtenerDetallesPrograma
-}
+};
